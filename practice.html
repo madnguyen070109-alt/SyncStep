@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    
+    <title>SyncStep</title>
+    <meta charset="utf-8" />
+	  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+	  <!-- link the webpage's stylesheet -->
+	  <link rel="stylesheet" href="/practice.css" />
+      <link rel="stylesheet" href="/general-style.css" />
+
+	  <!-- YouTube IFrame Player API — loads async, calls window.onYouTubeIframeAPIReady when ready -->
+	  <script src="https://www.youtube.com/iframe_api"></script>
+
+	  <!-- Firebase (Auth, Firestore, Storage) — shared config, imported by script.js -->
+	  <script type="module" src="/firebase-init.js"></script>
+
+	  <!-- link the webpage's JavaScript file (type="module" so MediaPipe's import syntax works) -->
+	  <script type="module" src="/script.js" defer></script>
+
+  </head>
+  <body>
+      <header class="top-bar">
+          <a href="index.html">
+          <img src="assets/Firefly (1).png" alt="SyncStep Logo" class="logo">
+        </a>
+        <div class="navRect">    
+          <div class="navigation">
+            <a href="index.html">
+              <img src="assets/home.png" alt="Home" class="home">
+            </a>
+              <a class="active" href="practice.html">Practice</a>
+              <a href="library.html">Library</a>
+              <a href="community.html">Community</a>
+              <a href="bookmarks.html">Bookmarks</a>
+              <a href="profile.html">Profile</a>
+            </div>
+			    </div>
+		    </header>
+      <hr>
+
+      <main class="practice-stage">
+        <!-- Left: YouTube reference video with synced skeleton overlay on top -->
+        <div class="video-column">
+          <div class="video-wrap" id="video-wrap">
+            <div id="yt-player"></div>
+            <canvas id="reference-overlay"></canvas>
+          </div>
+        </div>
+
+        <!-- Right: user's webcam with live MediaPipe skeleton overlay -->
+        <div class="webcam-column">
+          <div class="webcam-wrap" id="webcam-wrap">
+            <video id="webcam-feed" autoplay playsinline muted></video>
+            <canvas id="live-overlay"></canvas>
+          </div>
+          <button id="start-camera-btn" class="button">Start Camera</button>
+          <button id="stop-camera-btn" class="button" disabled>Stop Camera</button>
+        </div>
+      </main>
+
+      <!-- Persistent control row: speed / loop / mirror / phantom / view -->
+      <div class="control-row" id="control-row"></div>
+	</body>
+</html>

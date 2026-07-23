@@ -1,0 +1,72 @@
+:root {
+  --cream: #E7E5DF;
+  --ink: #071013;
+  --coral-active: #E24E64;
+  --coral-hover: #C93A50;
+  --warm-white: #F4F4F2;
+  --mint: #3FAE8A;
+}
+body {
+    color: var(--cream);
+}
+.top-bar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 10px;
+
+}
+
+/* Left logo */
+.logo {
+    height: 60px;   /* controls BOTH elements’ visual scale */
+    width: auto;
+    justify-self: start;
+    margin-right:20px;
+}
+
+.home {
+    height: 20px;   /* controls BOTH elements’ visual scale */
+    width: auto;
+    justify-self: start;
+}
+.navigation a:hover {
+    color: var(--coral-hover);
+}
+.button {
+    background-color: var(--coral-active);
+    border: none;
+    color: white;
+    padding: 10px 20px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 2px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.button:hover {
+    background-color: var(--coral-hover);
+}
+.navigation {
+  display: flex;
+  width: 100%;
+  gap: 40px;
+}
+
+.navigation a {
+  color: #071013;
+  text-decoration: none;
+  font-size: 1.0rem;
+}
+
+.navigation .active {
+    font-weight: bold;
+    color: var(--coral-active);
+}
+
+h5 {
+    color: var(--ink);
+    margin: 10px 0;
+}

@@ -1,0 +1,27 @@
+:root {
+  --cream: #E7E5DF;
+  --ink: #071013;
+  --coral-active: #E24E64;
+  --coral-hover: #C93A50;
+  --warm-white: #F4F4F2;
+  --mint: #3FAE8A;
+}
+h2 {
+    color: var(--ink);
+}
+p {
+    color: var(--ink);
+}
+.button {
+    background-color: var(--coral-active);
+    border: none;
+    color: var(--warm-white);
+    padding: 10px 20px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 2px;
+    border-radius: 6px;
+    cursor: pointer;
+}

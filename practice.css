@@ -1,0 +1,79 @@
+:root {
+  --cream: #E7E5DF;
+  --ink: #071013;
+  --coral-active: #E24E64;
+  --coral-hover: #C93A50;
+  --warm-white: #F4F4F2;
+  --mint: #3FAE8A;
+}
+.practice-stage {
+    display: flex;
+    gap: 24px;
+    padding: 20px;
+    flex-wrap: wrap;
+}
+
+.video-column,
+.webcam-column {
+    flex: 1 1 480px;
+}
+
+/* Shared positioning context so the overlay canvas can sit exactly on
+   top of the YouTube iframe / webcam video underneath it. */
+.video-wrap,
+.webcam-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background-color: var(--warm-white); /* Warm White, per Section 26 */
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#yt-player,
+#webcam-feed {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#webcam-feed {
+    object-fit: cover;
+}
+
+#reference-overlay,
+#live-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* clicks pass through to the video/webcam below */
+}
+
+/* Mirrored state - flips the video/webcam and its overlay together as one
+   unit, per Section 20's mirroring note, so joint coordinates never need
+   to be individually flipped in the drawing logic. */
+.video-wrap.mirrored,
+.webcam-wrap.mirrored {
+    transform: scaleX(-1);
+}
+
+.camera-controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.camera-controls .button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.control-row {
+    display: flex;
+    gap: 12px;
+    padding: 0 20px 20px;
+}
