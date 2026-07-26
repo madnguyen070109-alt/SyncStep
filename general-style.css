@@ -46,7 +46,24 @@ body {
     border-radius: 6px;
     cursor: pointer;
 }
+.oval-button {
+    background-color: var(--coral-active);
+    border: none;
+    color: white;
+    width: 55px;
+    height: 25px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 11px;
+    margin: 4px 2px;
+    border-radius: 30px;
+    cursor: pointer;
+}
 .button:hover {
+    background-color: var(--coral-hover);
+}
+.oval-button:hover {
     background-color: var(--coral-hover);
 }
 .navigation {
@@ -66,7 +83,7 @@ body {
     color: var(--coral-active);
 }
 
-h5 {
+h5, label {
     color: var(--ink);
     margin: 10px 0;
 }

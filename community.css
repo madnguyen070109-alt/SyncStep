@@ -1,3 +1,4 @@
+
 :root {
   --cream: #E7E5DF;
   --ink: #071013;
@@ -5,4 +6,26 @@
   --coral-hover: #C93A50;
   --warm-white: #F4F4F2;
   --mint: #3FAE8A;
+}
+.caption-rect {
+  background-color: var(--warm-white);
+  border: 1px solid var(--ink);
+  aspect-ratio: 31/9;
+  width: 60%;
+  padding-left: 10px;
+  border-radius: 8px;
+  margin-left:10px;
+  margin-bottom: 10px;
+  margin-top: 5px;
+}
+.community-rect {
+  background-color: var(--warm-white);
+  border: 1px solid var(--ink);
+  aspect-ratio: 35/9;
+  padding-top: 10px;
+  width: 90%;
+  border-radius: 8px;
+  margin: 0 auto 10px;
+  margin-bottom: 10px;
+  padding-left: 10px;
 }

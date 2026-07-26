@@ -11,12 +11,13 @@ import { getStorage } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-
 // TODO: paste your actual config from
 // Firebase console -> Project settings -> Your apps -> SDK setup and configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDojU9F-ObpmXA8wHhyNpVq5yeC2WUsIcw",
+  authDomain: "dance-for-change.firebaseapp.com",
+  projectId: "dance-for-change",
+  storageBucket: "dance-for-change.firebasestorage.app",
+  messagingSenderId: "254199824166",
+  appId: "1:254199824166:web:2081a16da7f08d56798be7",
+  measurementId: "G-DE41P070HX"
 };
 
 const app = initializeApp(firebaseConfig);

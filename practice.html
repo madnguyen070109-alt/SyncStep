@@ -56,12 +56,36 @@
             <video id="webcam-feed" autoplay playsinline muted></video>
             <canvas id="live-overlay"></canvas>
           </div>
-          <button id="start-camera-btn" class="button">Start Camera</button>
-          <button id="stop-camera-btn" class="button" disabled>Stop Camera</button>
+          <button id="start-camera-btn" class="button">Start Live Feed</button>
+          <button id="stop-camera-btn" class="button disabled">Stop Camera</button>
+          <button id="record" class="button disabled">Record Session</button>
         </div>
       </main>
 
       <!-- Persistent control row: speed / loop / mirror / phantom / view -->
-      <div class="control-row" id="control-row"></div>
+      <div class="control-grid">
+        <div class="control-item">
+          <h4>Playback Speed</h4>
+        </div>
+        <div class="control-item">
+          <h4>Loop</h4>
+        </div>
+      </div>
+        <button class="oval-button">+</button>
+        <input type="range" id="volume" name="volume" min="0.25" max="1" value="0.25" step=".05">
+        <button class="oval-button">-</button>
+        
+      <div class="control-item">
+      </div>
+      <button class="control-button">Mirror</button>
+      <button class="control-button">Phantom Overlay</button>
+      <select name="view" id="view">
+        <option value="side-by-side">Side by Side</option>
+        <option value="reference-only">Reference Only</option>
+        <option value="webcam-only">Webcam Only</option>
+      </select>
+
+        
+       
 	</body>
 </html>
