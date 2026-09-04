@@ -12,7 +12,12 @@
       <link rel="stylesheet" href="/general-style.css" />
 
 	  <!-- link the webpage's JavaScript file -->
-	  <script src="/script.js" defer></script>
+
+	  <!-- Firebase (Auth, Firestore, Storage) — shared config, imported by script.js -->
+	  <script type="module" src="/firebase-init.js"></script>
+
+	  <!-- link the webpage's JavaScript file (type="module" so MediaPipe's import syntax works) -->
+	  <script type="module" src="/script.js" defer></script>
 
     </head>
     <body>
@@ -30,9 +35,18 @@
                     <a href="community.html">Community</a>
                     <a class="active" href="bookmarks.html">Bookmarks</a>
                     <a href="profile.html">Profile</a>
+                    <a class="login-button" href="login.html">Login</a>
                 </div>
 			</div>
 		</header>
         <hr>
+        <h2>My Bookmarks</h2>
+        <p>Dances you've saved</p>
+        <div class="bookmarks-controls">
+            <label for="search-bar">Search Library:</label>
+            <input type="text" id="search-bar" name="search-bar" placeholder="Enter Song Title">
+            <div class="filter-chips" id="filter-chips"></div>
+        </div>
+        <div class="bookmarks-grid" id="bookmarks-grid"></div>
 	</body>
 </html>

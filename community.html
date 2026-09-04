@@ -12,7 +12,12 @@
     <link rel="stylesheet" href="/general-style.css" />
 
 	<!-- link the webpage's JavaScript file -->
-	<script src="/script.js" defer></script>
+
+	  <!-- Firebase (Auth, Firestore, Storage) — shared config, imported by script.js -->
+	  <script type="module" src="/firebase-init.js"></script>
+
+	  <!-- link the webpage's JavaScript file (type="module" so MediaPipe's import syntax works) -->
+	  <script type="module" src="/script.js" defer></script>
 
   </head>
     <body>
@@ -30,14 +35,31 @@
                     <a class="active" href="community.html">Community</a>
                     <a href="bookmarks.html">Bookmarks</a>
                     <a href="profile.html">Profile</a>
+                    <a class="login-button" href="login.html">Login</a>
                 </div>
 			</div>
 		</header>
-        <hr>
-      <div class="community-rect">
-        <label for="post-input">Share a practice update:</label>
-        <br>
-        <input type="text" class="caption-rect"id="post-input" name="post-input" placeholder="Caption...">
-      </div>
+    <hr>
+    <div class="update-card">
+    <!-- Title of the card -->
+      <h3 class="card-title">Share a practice update</h3>
+  
+    <!-- Form Container -->
+      <form class="update-form">
+        <input type="text" class="input-caption" placeholder="Caption...">
+
+        <label class="btn-photo">
+          <input type="file" accept="image/*" hidden>
+          <span>+ Photo</span>
+        </label>
+
+        <div class="action-column">
+          <select class="dropdown-song" id="songs-list">
+            <option value="">Search or select a song...</option>
+          </select>
+          <button type="submit" class="button">Post</button>
+        </div>
+      </form>
+    </div>
 	</body>
 </html>

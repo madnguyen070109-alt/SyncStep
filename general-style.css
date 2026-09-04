@@ -5,6 +5,8 @@
   --coral-hover: #C93A50;
   --warm-white: #F4F4F2;
   --mint: #3FAE8A;
+  --border-gray: #B0B0AF;
+  --rect-gray: #E9E9E6;
 }
 body {
     color: var(--cream);
@@ -30,10 +32,8 @@ body {
     width: auto;
     justify-self: start;
 }
-.navigation a:hover {
-    color: var(--coral-hover);
-}
-.button {
+
+.button,.custom-btn, .login-button {
     background-color: var(--coral-active);
     border: none;
     color: white;
@@ -60,19 +60,18 @@ body {
     border-radius: 30px;
     cursor: pointer;
 }
-.button:hover {
+.button:hover,.custom-btn:hover,.oval-button:hover, .login-button:hover {
     background-color: var(--coral-hover);
 }
-.oval-button:hover {
-    background-color: var(--coral-hover);
-}
+
 .navigation {
   display: flex;
   width: 100%;
   gap: 40px;
+  align-items: center;
 }
 
-.navigation a {
+.navigation a, header a {
   color: #071013;
   text-decoration: none;
   font-size: 1.0rem;
@@ -82,8 +81,13 @@ body {
     font-weight: bold;
     color: var(--coral-active);
 }
-
+.navigation a:hover {
+    color: var(--coral-hover);
+}
 h5, label {
     color: var(--ink);
     margin: 10px 0;
+}
+.hidden {
+    display: none;
 }

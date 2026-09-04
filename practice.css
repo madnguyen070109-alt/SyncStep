@@ -5,6 +5,8 @@
   --coral-hover: #C93A50;
   --warm-white: #F4F4F2;
   --mint: #3FAE8A;
+  --border-gray: #B0B0AF;
+  --rect-gray: #E9E9E6;
 }
 .practice-stage {
     display: flex;
@@ -18,6 +20,8 @@
 }
 .webcam-column {
     flex: 1 1 auto; /* takes up the remaining ~25% */
+    display: flex;
+    flex-direction: column; 
 }
 
 /* Shared positioning context so the overlay canvas can sit exactly on
@@ -30,6 +34,7 @@
     background-color: var(--warm-white); /* Warm White, per Section 26 */
     border-radius: 8px;
     overflow: hidden;
+    flex-shrink: 0; /* keeps its aspect-ratio size, doesn't get squeezed */
 }
 
 #yt-player,
@@ -43,8 +48,11 @@
 
 #webcam-feed {
     object-fit: cover;
+   
 }
-
+#webcam-feed, #live-overlay {
+    transform: scaleX(-1);
+}
 #reference-overlay,
 #live-overlay {
     position: absolute;
@@ -72,6 +80,12 @@
 button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+/* Used to fully swap the Start/Stop camera buttons rather than just
+   graying one out — see script.js startCamera()/stopCamera(). */
+.hidden {
+    display: none;
 }
 
 .control-row {
@@ -112,4 +126,35 @@ h4 {
 }
 .control-button:hover {
     background-color: var(--coral-hover);
+}
+#start-camera-btn, #stop-camera-btn, #record{
+    width:45%;
+    margin: 2%;
+    flex-shrink: 0; /* buttons keep their natural height, don't get squeezed */
+}
+p {
+    color: var(--ink);
+}
+.camera-buttons-row {
+    display: flex;
+    gap: 0; /* the buttons already carry their own margin below */
+    flex-shrink: 0;
+}
+/* Fills whatever vertical space is left in .webcam-column after
+   webcam-wrap + the button row, so its bottom lines up with the
+   bottom of the YouTube video — pure flexbox, no JS needed. */
+.score-rect {
+    width: 100%;
+    background-color: var(--rect-gray);
+    box-sizing: border-box;
+    flex: 1 1 auto;
+    min-height: 0; /* overrides browser's default min-height:auto on flex items, which was blocking growth */
+    display: flex;
+
+    padding: 10px;
+    border-radius: 10px;
+    border: 2px solid var(--border-gray);
+}
+.score-rect p {
+    margin: 0;
 }

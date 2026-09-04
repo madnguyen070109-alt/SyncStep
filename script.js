@@ -1,23 +1,36 @@
 // ============================================================
-// SyncStep — practice.html
-// Initializes the YouTube IFrame Player API and the MediaPipe
-// Pose Landmarker, then syncs a reference skeleton overlay to
-// YouTube playback and runs live pose detection on the webcam.
+// SyncStep — shared script.js across all pages
+// Runs the MediaPipe Pose Landmarker for live webcam pose
+// detection, the YouTube reference player + synced skeleton
+// overlay on practice.html, and page-specific wiring for
+// library.html / admin.html.
 // ============================================================
 
+// NOTE: pinned to an exact version (not @latest) — the JS wrapper and
+// the WASM binary must match exactly, or MediaPipe throws internal
+// errors like "ASM_CONSTS[code] is not a function". Check
+// https://www.npmjs.com/package/@mediapipe/tasks-vision for the current
+// stable release before bumping this.
+//
+// IMPORTANT: static `import ... from` requires a literal string, so the
+// version is hardcoded here directly. The MEDIAPIPE_VERSION constant
+// below is used for the WASM fileset path (a runtime fetch, so a
+// template literal is fine there) — if you bump the version, update
+// BOTH this import line and the constant so they stay in sync.
 import {
   PoseLandmarker,
   FilesetResolver
-} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+const MEDIAPIPE_VERSION = "0.10.14";
 
 import { db } from "/firebase-init.js";
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-
+import { collection, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+import { auth, provider } from "./firebase-init.js"; // Adjust the path to your config file
+import { signInWithPopup } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 // ---- Shared state -------------------------------------------------
-let ytPlayer;                 // YouTube player instance
 let poseLandmarker;            // MediaPipe Pose Landmarker instance
-let skeletonData = null;       // reference skeleton JSON for the current dance
-let currentDance = null;       // the dances/{danceId} Firestore document data
+let skeletonData = null;       // reference skeleton JSON for the current member
 let syncIntervalId = null;     // handle for the reference-sync polling loop
 let webcamLoopActive = false;  // guards the live-detection requestAnimationFrame loop
 let webcamStream = null;       // active MediaStream, kept so its tracks can be stopped
@@ -29,24 +42,88 @@ const webcamVideoEl = document.getElementById('webcam-feed');
 const startCameraBtn = document.getElementById('start-camera-btn');
 const stopCameraBtn = document.getElementById('stop-camera-btn');
 
-// ============================================================
-// 1. YOUTUBE IFRAME API
-// ============================================================
+// Elements used by sizeScoreRectToVideo() — score-rect's height tracking
+const scoreRect = document.querySelector('.score-rect');
+const videoWrap = document.getElementById('video-wrap');
 
-// YouTube's script calls this automatically on window once it has loaded —
-// name and signature are fixed by the API, don't rename this function. It
-// can't be declared async itself, so it delegates to an async helper.
+// Matches .score-rect's height to .video-wrap's actual rendered height,
+// so it lines up with the bottom of the YouTube video regardless of
+// viewport size.
+function sizeScoreRectToVideo() {
+  if (!scoreRect || !videoWrap) return;
+
+  const webcamWrap = document.getElementById('webcam-wrap');
+  const recordBtn = document.getElementById('record');
+  // Whichever of start/stop is currently visible drives the used-height
+  // calc; the hidden one contributes 0 since .hidden sets display:none.
+  const activeCameraBtn = (startCameraBtn && !startCameraBtn.classList.contains('hidden'))
+    ? startCameraBtn
+    : stopCameraBtn;
+
+  const videoHeight = videoWrap.getBoundingClientRect().height;
+
+  // Subtract the height everything above score-rect in the column already
+  // takes up (webcam box + buttons + their margins), so score-rect fills
+  // exactly what's left rather than pushing the column taller than the video.
+  const usedHeight = [webcamWrap, activeCameraBtn, recordBtn]
+    .filter(Boolean)
+    .reduce((sum, el) => {
+      const style = getComputedStyle(el);
+      const marginTop = parseFloat(style.marginTop) || 0;
+      const marginBottom = parseFloat(style.marginBottom) || 0;
+      return sum + el.getBoundingClientRect().height + marginTop + marginBottom;
+    }, 0);
+
+  const remaining = videoHeight - usedHeight;
+  scoreRect.style.height = Math.max(remaining, 0) + 'px';
+}
+
+// ============================================================
+// YOUTUBE PLAYER — practice.html
+// ============================================================
+let ytPlayer;
+let currentMember = null; // matched entry from dance.members, holds skeletonUrl
+
+// YouTube's script calls this automatically once its API has loaded —
+// name/signature are fixed by the API, don't rename it. It can't be
+// declared async itself, so it delegates to an async helper.
 window.onYouTubeIframeAPIReady = function () {
   if (!document.getElementById('yt-player')) return; // not on practice.html
   loadDanceAndCreatePlayer();
 };
 
+// Accepts a full YouTube URL (watch?v=, youtu.be/, embed/) or a bare
+// 11-char ID and returns just the ID that YT.Player actually needs.
+function extractYouTubeId(urlOrId) {
+  if (!urlOrId) return null;
+
+  if (/^[\w-]{11}$/.test(urlOrId)) return urlOrId; // already a bare ID
+
+  try {
+    const url = new URL(urlOrId);
+    if (url.hostname.includes('youtu.be')) {
+      return url.pathname.slice(1); // youtu.be/<id>
+    }
+    if (url.searchParams.has('v')) {
+      return url.searchParams.get('v'); // watch?v=<id>
+    }
+    const embedMatch = url.pathname.match(/\/embed\/([\w-]{11})/);
+    if (embedMatch) return embedMatch[1]; // embed/<id>
+  } catch {
+    // not a valid URL — fall through
+  }
+
+  console.warn(`Couldn't extract a video ID from "${urlOrId}"`);
+  return null;
+}
+
 async function loadDanceAndCreatePlayer() {
   const params = new URLSearchParams(window.location.search);
-  const danceId = params.get('dance'); // set by library.html's card links
+  const danceId = params.get('dance');
+  const videoParam = params.get('video'); // may be a full URL or a bare ID
 
-  if (!danceId) {
-    console.error('No ?dance=<id> in the URL — nothing to load.');
+  if (!danceId || !videoParam) {
+    console.error('practice.html needs both ?dance=<danceId>&video=<youtubeVideoId> in the URL.');
     return;
   }
 
@@ -56,12 +133,23 @@ async function loadDanceAndCreatePlayer() {
     return;
   }
 
-  // Expected fields on the dances/{danceId} doc, per Section 10's schema:
-  // youtubeVideoId, skeletonUrl, songTitle, artist, loopSections, etc.
-  currentDance = danceSnap.data();
+  const danceData = danceSnap.data();
+  // Match against the raw stored value (whatever format is in Firestore),
+  // not the extracted ID, since dance.members stores the original value.
+  currentMember = danceData.members?.find(m => m.youtubeVideoId === videoParam) || null;
+
+  if (!currentMember) {
+    console.warn(`Video "${videoParam}" isn't listed under any member of dance "${danceId}" — skeleton overlay won't load.`);
+  }
+
+  const videoId = extractYouTubeId(videoParam);
+  if (!videoId) {
+    console.error('Could not resolve a playable YouTube video ID.');
+    return;
+  }
 
   ytPlayer = new YT.Player('yt-player', {
-    videoId: currentDance.youtubeVideoId,
+    videoId,
     playerVars: {
       controls: 1,
       rel: 0,
@@ -76,21 +164,21 @@ async function loadDanceAndCreatePlayer() {
 
 function onPlayerReady() {
   sizeOverlayToPlayer();
-  loadSkeletonData(); // fetch the reference skeleton JSON, then start syncing
+  loadSkeletonData(currentMember); // fetch this member's skeleton JSON, ready for the sync loop
 }
 
 function onPlayerStateChange(event) {
-  // Pause the sync loop when the video isn't playing so it isn't wastefully
+  // Only poll/redraw while actually playing — no point burning cycles
   // redrawing the overlay every 100ms while paused.
   if (event.data === YT.PlayerState.PLAYING) {
-    startSyncLoop();
+    startSyncLoop(() => ytPlayer.getCurrentTime());
   } else {
     stopSyncLoop();
   }
 }
 
-// Matches the overlay canvas's pixel size to the YouTube iframe underneath it
-// so drawn joint coordinates line up with the video.
+// Matches the overlay canvas's pixel size to the YouTube iframe underneath
+// it so drawn joint coordinates line up with the video.
 function sizeOverlayToPlayer() {
   const iframe = document.querySelector('#yt-player iframe');
   if (!iframe || !referenceCanvas) return;
@@ -99,16 +187,15 @@ function sizeOverlayToPlayer() {
 }
 
 // ============================================================
-// 2. REFERENCE SKELETON DATA + SYNC LOOP
+// REFERENCE SKELETON DATA + SYNC LOOP
 // ============================================================
 
-async function loadSkeletonData() {
-  // skeletonUrl is the Storage download URL saved on the dance doc by
-  // admin.html when the dance was added (Section 24).
-  const skeletonUrl = currentDance?.skeletonUrl;
-
+async function loadSkeletonData(member) {
+  // skeletonUrl is the Storage download URL saved on the member entry by
+  // admin.html when the dance was added.
+  const skeletonUrl = member?.skeletonUrl;
   if (!skeletonUrl) {
-    console.warn('This dance has no skeletonUrl — sync loop will run with no data.');
+    console.warn('This member has no skeletonUrl — sync loop will run with no data.');
     return;
   }
 
@@ -116,13 +203,13 @@ async function loadSkeletonData() {
   skeletonData = await res.json(); // expected shape: array of { t, joints: [...] }
 }
 
-// Polls YouTube's current time every 100ms, finds the closest matching
-// keyframe in the skeleton data, and redraws the overlay at that keyframe.
-function startSyncLoop() {
+// Polls playback time every 100ms, finds the closest matching keyframe
+// in the skeleton data, and redraws the overlay at that keyframe.
+function startSyncLoop(getCurrentTimeFn) {
   if (syncIntervalId) return; // already running
   syncIntervalId = setInterval(() => {
-    if (!ytPlayer || typeof ytPlayer.getCurrentTime !== 'function') return;
-    const currentTime = ytPlayer.getCurrentTime();
+    if (typeof getCurrentTimeFn !== 'function') return;
+    const currentTime = getCurrentTimeFn();
     const keyframe = findClosestKeyframe(currentTime);
     drawSkeleton(referenceCanvas, keyframe, { opacity: 1 });
   }, 100);
@@ -142,12 +229,12 @@ function findClosestKeyframe(currentTime) {
 }
 
 // ============================================================
-// 3. MEDIAPIPE POSE LANDMARKER (live webcam detection)
+// MEDIAPIPE POSE LANDMARKER (live webcam detection)
 // ============================================================
 
 async function initPoseLandmarker() {
   const vision = await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+    `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`
   );
 
   poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
@@ -175,8 +262,17 @@ async function startCamera() {
     webcamLoopActive = true;
     requestAnimationFrame(detectWebcamLoop);
 
-    startCameraBtn.disabled = true;
-    stopCameraBtn.disabled = false;
+    // Swap which button is visible — waits until permission actually
+    // succeeds, so a denial leaves Start visible instead of silently
+    // showing Stop with nothing running.
+    startCameraBtn.classList.add('hidden');
+    startCameraBtn.classList.remove('button');
+    stopCameraBtn.classList.remove('hidden');
+    stopCameraBtn.classList.add('button');
+
+    // Button swap can change the column's layout height slightly —
+    // recalc so score-rect stays aligned with the video.
+    sizeScoreRectToVideo();
   } catch (err) {
     // TODO: swap for the friendly retry-UI error message from the spec
     // rather than a console log — camera permission denial needs to be
@@ -199,28 +295,63 @@ function stopCamera() {
   const ctx = liveCanvas.getContext('2d');
   ctx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
 
-  startCameraBtn.disabled = false;
-  stopCameraBtn.disabled = true;
+  // Swap back to Start
+  stopCameraBtn.classList.add('hidden');
+  stopCameraBtn.classList.remove('button');
+  startCameraBtn.classList.add('button');
+  startCameraBtn.classList.remove('hidden');
+
+  // Button swap can change the column's layout height slightly —
+  // recalc so score-rect stays aligned with the video.
+  sizeScoreRectToVideo();
 }
 
+// NOTE: previously this bailed out permanently if poseLandmarker wasn't
+// ready on the loop's first tick (initPoseLandmarker() takes a few
+// seconds to load the WASM runtime + model, and Start Camera can be
+// clicked before it resolves). Now the loop stays alive and just skips
+// drawing until the model is ready, instead of returning without
+// re-scheduling itself.
 function detectWebcamLoop() {
-  if (!webcamLoopActive || !poseLandmarker) return;
+  if (!webcamLoopActive) return;
 
-  const result = poseLandmarker.detectForVideo(webcamVideoEl, performance.now());
-  const landmarks = result.landmarks?.[0] || null;
-  drawSkeleton(liveCanvas, landmarks, { opacity: 1 });
+  if (poseLandmarker) {
+    const result = poseLandmarker.detectForVideo(webcamVideoEl, performance.now());
+    const landmarks = result.landmarks?.[0] || null;
+    drawSkeleton(liveCanvas, landmarks, { opacity: 1 });
+  }
 
   requestAnimationFrame(detectWebcamLoop);
 }
 
 // ============================================================
-// 4. SHARED OVERLAY DRAWING
+// SHARED OVERLAY DRAWING
 // ============================================================
 // Used for both the reference overlay (pre-recorded keyframes) and the
 // live overlay (real-time MediaPipe results) — same drawing logic, just
 // fed from different data sources, per the phantom-overlay note in the spec.
+//
+// Visual style follows the "ghost overlay" reference clip: a soft glowing
+// outline rather than a thin stick-figure. Hand landmarks (pinky, index,
+// thumb) are drawn as their own pass, with a slightly larger joint radius
+// than the rest of the body, so the wrist→finger fan-out reads clearly
+// instead of collapsing into a single dot at the wrist.
 
 const POSE_CONNECTIONS = PoseLandmarker.POSE_CONNECTIONS;
+
+// Pose Landmarker indices for the hand points (pinky, index, thumb —
+// wrist itself, 15/16, stays part of the main limb line so the forearm
+// doesn't get a visible gap at the wrist).
+const HAND_POINT_INDICES = new Set([17, 18, 19, 20, 21, 22]);
+
+// Split once: connections touching a hand point (the wrist→finger fan-out
+// and the pinky↔index cross-link) vs. everything else (torso/limbs).
+const HAND_CONNECTIONS = [...POSE_CONNECTIONS].filter(
+  ({ start, end }) => HAND_POINT_INDICES.has(start) || HAND_POINT_INDICES.has(end)
+);
+const BODY_CONNECTIONS = [...POSE_CONNECTIONS].filter(
+  ({ start, end }) => !HAND_POINT_INDICES.has(start) && !HAND_POINT_INDICES.has(end)
+);
 
 function drawSkeleton(canvas, landmarks, { opacity = 1 } = {}) {
   if (!canvas) return;
@@ -229,11 +360,22 @@ function drawSkeleton(canvas, landmarks, { opacity = 1 } = {}) {
   if (!landmarks) return;
 
   ctx.globalAlpha = opacity;
-  ctx.strokeStyle = '#3fae8a'; // Mint, per Section 26 — reserved for positive/feedback state
-  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
 
-  // Bones
-  POSE_CONNECTIONS.forEach(({ start, end }) => {
+  // Soft glow behind every stroke/dot — this is what gives the overlay
+  // its "ghost" outline look instead of a flat thin line. Monochrome
+  // white, matching the reference clip, rather than Section 26's Mint —
+  // the ghost overlay is its own visual mode, not a "positive feedback"
+  // state, so it intentionally sits outside that palette rule.
+  ctx.shadowColor = 'rgba(255, 255, 255, 0.85)';
+  ctx.shadowBlur = 10;
+
+  // Body bones (torso/limbs) — drawn thick so the glow reads as one
+  // continuous outline.
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+  ctx.lineWidth = 6;
+  BODY_CONNECTIONS.forEach(({ start, end }) => {
     const a = landmarks[start];
     const b = landmarks[end];
     if (!a || !b) return;
@@ -243,19 +385,37 @@ function drawSkeleton(canvas, landmarks, { opacity = 1 } = {}) {
     ctx.stroke();
   });
 
-  // Joints
-  ctx.fillStyle = '#e24e64'; // Coral Active, per Section 26
-  landmarks.forEach((point) => {
+  // Hands — a separate, slightly thinner pass so the wrist→pinky/index/thumb
+  // fan-out stays crisp and doesn't get swallowed by the thicker body
+  // strokes or lost in the glow blur.
+  ctx.lineWidth = 4;
+  HAND_CONNECTIONS.forEach(({ start, end }) => {
+    const a = landmarks[start];
+    const b = landmarks[end];
+    if (!a || !b) return;
     ctx.beginPath();
-    ctx.arc(point.x * canvas.width, point.y * canvas.height, 4, 0, 2 * Math.PI);
+    ctx.moveTo(a.x * canvas.width, a.y * canvas.height);
+    ctx.lineTo(b.x * canvas.width, b.y * canvas.height);
+    ctx.stroke();
+  });
+
+  // Joints — hand points get a slightly larger radius than body joints so
+  // fingertip/thumb positions read as distinct points rather than
+  // disappearing into the glow.
+  landmarks.forEach((point, idx) => {
+    const isHandPoint = HAND_POINT_INDICES.has(idx);
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)'; // monochrome ghost, matching the reference clip
+    ctx.arc(point.x * canvas.width, point.y * canvas.height, isHandPoint ? 5 : 4, 0, 2 * Math.PI);
     ctx.fill();
   });
 
+  ctx.shadowBlur = 0;
   ctx.globalAlpha = 1;
 }
 
 // ============================================================
-// 5. STARTUP
+// STARTUP
 // ============================================================
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -269,5 +429,250 @@ window.addEventListener('DOMContentLoaded', () => {
     stopCameraBtn.addEventListener('click', stopCamera);
   }
 
-  window.addEventListener('resize', sizeOverlayToPlayer);
+  // Initial pass in case video-wrap already has its aspect-ratio height
+  // on load.
+  sizeScoreRectToVideo();
+  sizeOverlayToPlayer();
 });
+
+window.addEventListener('resize', () => {
+  sizeScoreRectToVideo();
+  sizeOverlayToPlayer();
+});
+
+// ============================================================
+// ADMIN — dynamic loop-section rows
+// ============================================================
+// Guarded so this safely no-ops on any page other than admin.html,
+// where #add-timestamps and #loop-sections-list don't exist.
+
+function addSectionRow(container, label = '', start = '', end = '') {
+  const row = document.createElement('div');
+  row.className = 'section-row';
+  row.innerHTML = `
+    <input type="number" placeholder="Start (sec)" class="section-start" value="${start}">
+    <input type="number" placeholder="End (sec)" class="section-end" value="${end}">
+    <input type="text" placeholder="section name" class="section-label" value="${label}">
+    <button type="button" class="remove-section">✕</button>
+  `;
+  row.querySelector('.remove-section').addEventListener('click', () => row.remove());
+  container.appendChild(row);
+}
+
+// NOTE: the members schema field for a member's display name is `Name`
+// (capitalized), matching the dances/{danceId}.members array-of-maps
+// shape written by this form.
+function addMemberRow(container, Name = '', youtubeVideoId = '', skeletonUrl = '') {
+  const row = document.createElement('div');
+  row.className = 'section-row';
+  row.innerHTML = `
+    <input type="text" placeholder="Member name" class="member-name" value="${Name}">
+    <input type="text" placeholder="Youtube Video Id" class="member-youtube-id" value="${youtubeVideoId}">
+    <input type="file" accept=".json,application/json" class="member-skeleton">
+    <button type="button" class="remove-section">✕</button>
+  `;
+  row.querySelector('.remove-section').addEventListener('click', () => row.remove());
+  container.appendChild(row);
+}
+
+// ============================================================
+// LIBRARY — fetch all dances once, render cards, filter client-side
+// ============================================================
+// Guarded so this safely no-ops on any page other than library.html.
+
+const libraryGrid = document.getElementById('library-grid');
+const filterChipsEl = document.getElementById('filter-chips');
+const librarySearchBar = document.getElementById('search-bar');
+
+let allDances = [];
+let activeArtist = null;
+
+if (libraryGrid) {
+  loadLibrary();
+  if (librarySearchBar) {
+    librarySearchBar.addEventListener('input', renderLibraryGrid);
+  }
+}
+
+async function loadLibrary() {
+  try {
+    const snap = await getDocs(collection(db, 'dances'));
+    allDances = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderFilterChips();
+    renderLibraryGrid();
+  } catch (err) {
+    console.error('Failed to load dances from Firestore:', err);
+    libraryGrid.innerHTML = '<p>Could not load the library. Please try again later.</p>';
+  }
+}
+
+function renderFilterChips() {
+  if (!filterChipsEl) return;
+  const artists = [...new Set(allDances.map(d => d.artist))].sort();
+
+  filterChipsEl.innerHTML = '';
+  filterChipsEl.appendChild(createChip('All', null));
+  artists.forEach(artist => filterChipsEl.appendChild(createChip(artist, artist)));
+}
+
+function createChip(label, artistValue) {
+  const chip = document.createElement('button');
+  chip.type = 'button';
+  chip.className = 'filter-chip' + (activeArtist === artistValue ? ' active' : '');
+  chip.textContent = label;
+  chip.addEventListener('click', () => {
+    activeArtist = artistValue;
+    renderFilterChips();
+    renderLibraryGrid();
+  });
+  return chip;
+}
+
+function renderLibraryGrid() {
+  if (!libraryGrid) return;
+  const query = (librarySearchBar?.value || '').trim().toLowerCase();
+
+  const filtered = allDances.filter(dance => {
+    const matchesArtist = !activeArtist || dance.artist === activeArtist;
+    const matchesSearch = !query || dance.songTitle?.toLowerCase().includes(query);
+    return matchesArtist && matchesSearch;
+  });
+
+  libraryGrid.innerHTML = filtered.length
+    ? ''
+    : '<p>No dances match your search.</p>';
+
+  filtered.forEach(dance => libraryGrid.appendChild(createDanceCard(dance)));
+}
+
+// Selecting a member navigates to practice.html with both the dance's
+// Firestore doc ID and the member's raw youtubeVideoId (URL-encoded,
+// since it may itself be a full YouTube URL containing its own ? and =).
+// loadDanceAndCreatePlayer() re-matches against dance.members using this
+// same raw value, then extracts the bare video ID for YT.Player.
+function createDanceCard(dance) {
+  const card = document.createElement('div');
+  card.className = 'dance-card';
+  card.innerHTML = `
+    <img class="dance-card-thumb" src="${dance.thumbnailUrl || ''}" alt="${dance.songTitle}">
+    <div class="dropdown">
+      <div class="dance-card-info">
+        <p class="dance-card-title">${dance.songTitle}</p>
+        <p class="dance-card-artist">${dance.artist}</p>
+      </div>
+      <select class="dance-member-select">
+        <option value="">Select a member</option>
+        ${dance.members?.map(member => `
+          <option value="${member.youtubeVideoId}">${member.Name}</option>
+        `).join('') || ''}
+      </select>
+    </div>
+  `;
+
+  const select = card.querySelector('.dance-member-select');
+  select.addEventListener('change', () => {
+    if (!select.value) return; // ignore the placeholder option
+    window.location.href = `practice.html?dance=${dance.id}&video=${encodeURIComponent(select.value)}`;
+  });
+
+  return card;
+}
+
+// ============================================================
+// ADMIN — multiple dance entries
+// ============================================================
+
+let danceRowCount = 0;
+
+function addDanceEntry() {
+  const danceIndex = danceRowCount++;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'dance-entry';
+  wrapper.dataset.danceIndex = danceIndex;
+
+  wrapper.innerHTML = `
+    <hr>
+    <div class="input-group">
+      <label>Document ID</label><br>
+      <input type="text" class="document-id" placeholder="Enter the document ID">
+    </div>
+    <div class="input-group">
+      <label>Thumbnail URL:</label><br>
+      <input type="text" class="thumbnail-url" placeholder="Enter the thumbnail URL">
+    </div>
+    <div class="input-group">
+      <label>Song Title:</label><br>
+      <input type="text" class="song-title" placeholder="Enter the song title">
+    </div>
+    <div class="input-group">
+      <label>Artist/Group:</label><br>
+      <input type="text" class="artist" placeholder="Enter the artist or group name">
+    </div>
+    <div class="input-group">
+      <label>Loop Section Timestamps:</label>
+      <div class="loop-sections-list"></div>
+      <h5 class="add-timestamps button">Add New Timestamps</h5>
+    </div>
+    <div class="input-group">
+      <label>Members:</label>
+      <div class="members-list"></div>
+      <h5 class="add-members button">Add Member</h5>
+    </div>
+    <button type="button" class="remove-dance button">Remove This Dance</button>
+  `;
+
+  // Scope the row-builders to *this* entry's own containers instead of
+  // a single global list, so each dance keeps its own timestamps/members.
+  wrapper.querySelector('.add-timestamps').addEventListener('click', () => {
+    addSectionRow(wrapper.querySelector('.loop-sections-list'));
+  });
+  wrapper.querySelector('.add-members').addEventListener('click', () => {
+    addMemberRow(wrapper.querySelector('.members-list'));
+  });
+  wrapper.querySelector('.remove-dance').addEventListener('click', () => {
+    wrapper.remove();
+  });
+
+  document.getElementById('add-dance-list').appendChild(wrapper);
+}
+
+const addDancesBtn = document.getElementById('add-dances');
+if (addDancesBtn) {
+  addDancesBtn.addEventListener('click', addDanceEntry);
+}
+
+// Seed the form with one dance entry on load, instead of static markup
+window.addEventListener('DOMContentLoaded', () => {
+  if (document.getElementById('add-dance-list')) addDanceEntry();
+});
+
+// community.html — post form submit handler not yet built (deferred)
+// bookmarks.html — depends on Auth, not yet built (deferred)
+
+const loginButton = document.getElementById("google-signup-button");
+
+// Listen for the click event to trigger the sign-in
+loginButton.addEventListener("click", () => {
+  signInWithPopup(auth, provider)
+    .then((result) => {
+      console.log("Successfully logged in:", result.user.displayName);
+      // Here you can redirect the user or update the screen
+    })
+    .catch((error) => {
+      console.error("Login error occurred:", error.message);
+    });
+});
+
+const next = document.getElementById("next");
+const fname = document.getElementById("fname");
+const lname = document.getElementById("lname");
+const email = document.getElementById("email");
+const password = document.getElementById("password");
+next.addEventListener("click", () => {
+  fname.classList.add("hidden");
+  lname.classList.add("hidden");
+  email.classList.remove("hidden");
+  password.classList.remove("hidden");
+  
+})

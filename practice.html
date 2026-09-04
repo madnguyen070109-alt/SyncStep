@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html>
   <head>
-    
     <title>SyncStep</title>
     <meta charset="utf-8" />
 	  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
@@ -20,72 +19,78 @@
 	  <!-- link the webpage's JavaScript file (type="module" so MediaPipe's import syntax works) -->
 	  <script type="module" src="/script.js" defer></script>
 
-  </head>
-  <body>
-      <header class="top-bar">
-          <a href="index.html">
-          <img src="assets/Firefly (1).png" alt="SyncStep Logo" class="logo">
-        </a>
-        <div class="navRect">    
-          <div class="navigation">
+    </head>
+    <body>
+        <header class="top-bar">
             <a href="index.html">
-              <img src="assets/home.png" alt="Home" class="home">
+                <img src="assets/Firefly (1).png" alt="SyncStep Logo" class="logo">
             </a>
-              <a class="active" href="practice.html">Practice</a>
-              <a href="library.html">Library</a>
-              <a href="community.html">Community</a>
-              <a href="bookmarks.html">Bookmarks</a>
-              <a href="profile.html">Profile</a>
+            <div class="navRect">    
+                <div class="navigation">
+                    <a href="index.html">
+                        <img src="assets/home.png" alt="Home" class="home">
+                    </a>
+                    <a class="active" href="practice.html">Practice</a>
+                    <a href="library.html">Library</a>
+                    <a href="community.html">Community</a>
+                    <a href="bookmarks.html">Bookmarks</a>
+                    <a href="profile.html">Profile</a>
+                    <a class="login-button" href="login.html">Login</a>
+                </div>
             </div>
-			    </div>
-		    </header>
-      <hr>
+        </header>
+        <hr>
+        <main class="practice-stage">
+            <!-- Left: YouTube reference video with synced skeleton overlay on top -->
+            <div class="video-column">
+                <div class="video-wrap" id="video-wrap">
+                    <div id="yt-player"></div>
+                    <canvas id="reference-overlay"></canvas>
+                </div>
+            </div>
 
-      <main class="practice-stage">
-        <!-- Left: YouTube reference video with synced skeleton overlay on top -->
-        <div class="video-column">
-          <div class="video-wrap" id="video-wrap">
-            <div id="yt-player"></div>
-            <canvas id="reference-overlay"></canvas>
-          </div>
+                <!-- Right: user's webcam with live MediaPipe skeleton overlay -->
+            <!-- Right: user's webcam with live MediaPipe skeleton overlay -->
+            <div class="webcam-column">
+                <div class="webcam-wrap" id="webcam-wrap">
+                    <video id="webcam-feed" autoplay playsinline muted></video>
+                    <canvas id="live-overlay"></canvas>
+                </div>
+                <div class="camera-buttons-row">
+                    <button id="start-camera-btn" class="button">Start Camera</button>
+                    <button id="stop-camera-btn" class="hidden">Stop Camera</button>
+                    <button id="record" class="button disabled">Record Session</button>
+                </div>
+                <div class="score-rect">
+                    <p>SCORE</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Persistent control row: speed / loop / mirror / phantom / view -->
+        <div class="control-grid">
+            <div class="control-item">
+                <h4>Playback Speed</h4>
+                <div>
+                    <button class="oval-button">0.25x</button>
+                    <button class="oval-button">0.5x</button>
+                    <button class="oval-button">0.75x</button>
+                    <button class="oval-button">1x</button>
+                </div>
+                
+            </div>
+            <div class="control-item">
+                <h4>Loop</h4>
+            </div>
         </div>
-
-        <!-- Right: user's webcam with live MediaPipe skeleton overlay -->
-        <div class="webcam-column">
-          <div class="webcam-wrap" id="webcam-wrap">
-            <video id="webcam-feed" autoplay playsinline muted></video>
-            <canvas id="live-overlay"></canvas>
-          </div>
-          <button id="start-camera-btn" class="button">Start Live Feed</button>
-          <button id="stop-camera-btn" class="button disabled">Stop Camera</button>
-          <button id="record" class="button disabled">Record Session</button>
-        </div>
-      </main>
-
-      <!-- Persistent control row: speed / loop / mirror / phantom / view -->
-      <div class="control-grid">
         <div class="control-item">
-          <h4>Playback Speed</h4>
         </div>
-        <div class="control-item">
-          <h4>Loop</h4>
-        </div>
-      </div>
-        <button class="oval-button">+</button>
-        <input type="range" id="volume" name="volume" min="0.25" max="1" value="0.25" step=".05">
-        <button class="oval-button">-</button>
-        
-      <div class="control-item">
-      </div>
-      <button class="control-button">Mirror</button>
-      <button class="control-button">Phantom Overlay</button>
-      <select name="view" id="view">
-        <option value="side-by-side">Side by Side</option>
-        <option value="reference-only">Reference Only</option>
-        <option value="webcam-only">Webcam Only</option>
-      </select>
-
-        
-       
+        <button class="control-button">Mirror</button>
+        <button class="control-button">Phantom Overlay</button>
+        <select name="view" id="view">
+            <option value="side-by-side">Side by Side</option>
+            <option value="reference-only">Reference Only</option>
+            <option value="webcam-only">Webcam Only</option>
+        </select>   
 	</body>
 </html>

@@ -12,7 +12,12 @@
 	  <link rel="stylesheet" href="/general-style.css" />
 
 	  <!-- link the webpage's JavaScript file -->
-	  <script src="/script.js" defer></script>
+
+	  <!-- Firebase (Auth, Firestore, Storage) — shared config, imported by script.js -->
+	  <script type="module" src="/firebase-init.js"></script>
+
+	  <!-- link the webpage's JavaScript file (type="module" so MediaPipe's import syntax works) -->
+	  <script type="module" src="/script.js" defer></script>
 
     </head>
     <body>
@@ -33,49 +38,12 @@
           </div>
 			  </div>
 		  </header>
-    <hr>
-    <label for="song-title">Song Title:</label>
-    <h5></h5>
-    <input type="text" id="song-title" name="song-title" placeholder="Enter the song title">
-    <h5></h5>
-    <label for="artist">Artist/Group:</label>
-    <h5></h5>
-    <input type="text" id="artist" name="artist" placeholder="Enter the artist or group name">
-    <h5></h5>
-    <label for="members">Member Name(s):</label>
-    <h5></h5>
-    <input type="text" id="members" name="members" placeholder="Enter member names">
-    <h5></h5>
-    <label for="youtube-id">Youtube Video ID:</label>
-    <h5></h5>
-    <input type="text" id="youtube-id" name="youtube-id" placeholder="Enter the Youtube Video ID">
-    <h5></h5>
-    <label for="loop-sections">Loop Section Timestamps:</label>
-    <div id="loop-sections-list"></div>
-    <h5 id="add-timestamps" class="button">Add New Timestamps</h5>
-    <br>
-    <label for="file-input">Skeleton JSON File</label>
-    <input type="file" id="file-input" multiple hidden>
-    <h5 class="button">Add Dance to Library</h5>
-    <script>
-    // 1. Select your specific button and container from the HTML above
-    const addButton = document.getElementById('add-timestamps');
-    const container = document.getElementById('loop-sections-list');
-
-    // 2. Listen for clicks to add the timestamp fields layout
-    addButton.addEventListener('click', () => {
-        // Formats 4 connected input boxes with matching placeholders
-        const timestampRow = `
-            <div class="timestamp-row" style="margin-bottom: 15px; display: flex; gap: 10px;">
-                <input type="text" name="start[]" placeholder="start" style="width: 25%;">
-                <input type="text" name="end[]" placeholder="end" style="width: 25%;">
-            </div>
-        `;
-        
-        // Safely injects the new row without wiping out existing user text
-        container.insertAdjacentHTML('beforeend', timestampRow);
-    });
-</script>
+    <form id="add-dance-form">
+      <div id="add-dance-list"></div>
+      <h5 id="add-dances" class="button">Add Dance</h5>
+      <br>
+      <button type="submit" class="button">Add Dance(s) to Library</button>
+    
 
 	</body>
 </html>
